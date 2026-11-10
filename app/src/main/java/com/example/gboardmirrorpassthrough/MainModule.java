@@ -94,7 +94,7 @@ public final class MainModule extends XposedModule {
                             int code = (Integer) chain.getArg(0);
                             KeyEvent event = (KeyEvent) chain.getArg(1);
                             if (down) {
-                                if (event != null && eventLogs.getAndIncrement() < 60) {
+                                if (isMirror(event) && eventLogs.getAndIncrement() < 60) {
                                     trace(Log.INFO, "RC4 KEYDOWN code=" + code
                                             + " device=" + event.getDeviceId()
                                             + " source=0x" + Integer.toHexString(event.getSource())
@@ -255,9 +255,12 @@ public final class MainModule extends XposedModule {
         }
     }
 
+
     private static boolean isAltGr(KeyEvent e) {
-        return (e.getMetaState() & KeyEvent.META_ALT_RIGHT_ON) != 0
-                || (e.isAltPressed() && e.isCtrlPressed());
+        int meta = e.getMetaState();
+        return (meta & 0x20) != 0
+                || ((meta & 0x1000) != 0 && (meta & 0x2) != 0)
+                || ((meta & 0x2) != 0 && (meta & 0x10) != 0);
     }
 
     private static boolean upper(KeyEvent e) {
@@ -268,10 +271,13 @@ public final class MainModule extends XposedModule {
      * Mirrors original v0.6 priority: AltGr, manual Turkish Q keys,
      * shifted symbols, Unicode fallback.
      */
+
+    // Exact selective mapping order recovered from v0.6 DEX.
     private static String mappedText(int code, KeyEvent e, boolean altGr) {
-        if (code == KeyEvent.KEYCODE_AT) return "@";
-        if (code == KeyEvent.KEYCODE_Q && e.getUnicodeChar() == '@') return "@";
+        if (code == KeyEvent.KEYCODE_AT ||
+                (code == KeyEvent.KEYCODE_Q && e.getUnicodeChar() == '@')) return "@";
         if (altGr) return altGrSymbol(code, e);
+        if (ordinaryShortcut(e)) return null;
         boolean capital = upper(e);
         switch (code) {
             case KeyEvent.KEYCODE_I: return capital ? "I" : "ı";
@@ -281,18 +287,12 @@ public final class MainModule extends XposedModule {
             case KeyEvent.KEYCODE_SEMICOLON: return capital ? "Ş" : "ş";
             case KeyEvent.KEYCODE_APOSTROPHE: return capital ? "İ" : "i";
             case KeyEvent.KEYCODE_SLASH: return capital ? "Ö" : "ö";
+            default: break;
         }
-        String symbol = turkishSymbol(code, e.isShiftPressed());
-        if (symbol != null) return symbol;
-        if (code >= KeyEvent.KEYCODE_A && code <= KeyEvent.KEYCODE_Z) {
-            char letter = (char) ('a' + code - KeyEvent.KEYCODE_A);
-            return String.valueOf(capital ? Character.toUpperCase(letter) : letter);
-        }
-        if (code == KeyEvent.KEYCODE_SPACE) return " ";
-        int c = e.getUnicodeChar();
-        if (c <= 0 || !Character.isValidCodePoint(c) || Character.isISOControl(c))
-            return null;
-        return new String(Character.toChars(c));
+        // Native Gboard keeps ordinary ASCII letters and unshifted digits.
+        if (code >= KeyEvent.KEYCODE_0 && code <= KeyEvent.KEYCODE_9
+                && !e.isShiftPressed()) return null;
+        return turkishSymbol(code, e.isShiftPressed());
     }
 
     private static String turkishSymbol(int code, boolean shift) {
