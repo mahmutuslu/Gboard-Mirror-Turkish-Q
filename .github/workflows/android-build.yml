@@ -1,75 +1,48 @@
-name: Build modern libxposed API 102 RC8 APK
+name: Publish verified Modern API 102 v1.0.0 Final
 
 on:
   push:
-    branches: [main, 'fix/rc8-shift-unknown']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  promote:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout verified source
         uses: actions/checkout@v4
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Check Android SDK and install platform
+      - name: Verify final implementation is exactly RC8
+        run: |
+          git diff --exit-code 9d1755b0056ad58ba9e82cbc0b318cdb2b8931ba HEAD -- \
+            app/src/main/java \
+            app/build.gradle.kts \
+            app/src/main/resources \
+            app/src/main/AndroidManifest.xml \
+            app/src/main/res
+      - name: Download and verify the exact device-tested RC8 APK
         shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)
-          test -x "$SDKMANAGER"
-          "$SDKMANAGER" --version
-          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Build modern RC8 APK
-        run: gradle --no-daemon :app:assembleDebug
-      - name: Verify recovered v0.6 hook target
-        run: |
-          grep -F 'Class.forName("aeht", false, loader)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          ! grep -F 'installTarget(InputMethodService.class' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          grep -F 'hookedMethods.contains(method)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          grep -F 'install("onPackageReady", actual)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          ! grep -F 'install("onPackageLoaded",' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-      - name: Verify printable direct commit and diagnostic code
-        run: |
-          grep -F 'RC8 QUESTION COMMIT' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          grep -F 'recentShift(ime)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-          grep -F 'else if (code == KeyEvent.KEYCODE_V) action = android.R.id.paste;' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
-      - name: Verify modern module metadata and APK
-        run: |
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          test -s "$APK"
+          set -euo pipefail
+          URL="https://github.com/mahmutuslu/Gboard-Mirror-Turkish-Q/releases/download/v1.0.0-modern-api102-rc8/app-debug.apk"
+          APK="Gboard-Mirror-Turkish-Q-v1.0.0-Final.apk"
+          curl --fail --location --retry 3 --silent --show-error "$URL" -o "$APK"
+          echo "fc909f0f4842ed16e87118db4175067ffbff639ce2936fc5d3a52607bbb2a280  $APK" | sha256sum --check
           unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/java_init.list'
           unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/module.prop'
           unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/scope.list'
-          unzip -p "$APK" META-INF/xposed/java_init.list
-          unzip -p "$APK" META-INF/xposed/module.prop
-          unzip -p "$APK" META-INF/xposed/scope.list
-          sha256sum "$APK"
-      - name: Upload test APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC8
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-      - name: Publish RC8 pre-release after successful build
+          echo "Releasing byte-identical tested RC8 artifact as stable v1.0.0"
+      - name: Attach verified APK to v1.0.0 stable release
         if: github.repository == 'mahmutuslu/Gboard-Mirror-Turkish-Q' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-modern-api102-rc8
-          name: Gboard Mirror Turkish Q — Modern API 102 RC8 (test)
-          prerelease: true
-          make_latest: false
+          tag_name: v1.0.0
+          target_commitish: main
+          name: Gboard Mirror Turkish Q — Modern API 102 v1.0.0 Final
+          prerelease: false
+          make_latest: true
           body_path: RELEASE_NOTES_TR.md
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: Gboard-Mirror-Turkish-Q-v1.0.0-Final.apk
           fail_on_unmatched_files: true

@@ -1,41 +1,39 @@
-# Gboard Mirror Turkish Q — modern libxposed API 102
+# Gboard Mirror Turkish Q — Modern libxposed API 102
 
-Xiaomi PC Manager ekran yansıtmasındaki fiziksel Türkçe Q klavye girişini Gboard'da işlemek için libxposed API 102'ye taşıma projesi.
+**En son kararlı sürüm: [v1.0.0 Final](https://github.com/mahmutuslu/Gboard-Mirror-Turkish-Q/releases/tag/v1.0.0)**
 
-**Çalışan referans:** v0.6 legacy APK. Kullanıcı bunu Xiaomi 15 Ultra ve PC Manager 6.0.2.30'da doğruladı.
+Xiaomi PC Manager ekran yansıtmasında Windows'un fiziksel **Türkçe Q klavyesinden** Gboard'a doğrudan yazma desteği sunan Modern Xposed API 102 modülü.
 
-**Modern sürüm:** RC1–RC4 cihaz testinde başarısız. RC7'de temel klavye ve Shift+? kullanıcı tarafından doğrulandı; RC8'de Ctrl+V doğrudan yapıştırma düzeltmesi **henüz cihazda test edilmedi**, Final değildir. Eski v0.6'yı saklayın.
+## Durum
 
-## RC7'te denenen düzeltme
+10 Kasım 2026'da kullanıcı, Xiaomi 15 Ultra üzerindeki Gboard ile ekran yansıtmasından doğrudan Türkçe Q metin, özel karakterler, soru işareti ve Ctrl+C/V dahil tüm işlevleri çalışır doğruladı.
 
-- Gerçek eski hedef Gboard `aeht.onKeyDown/onKeyUp` (v0.6 DEX kodunda doğrulandı).
-- Modern API 102'de `onPackageLoaded` aşamasındaki **erken varsayılan classloader** yerine `onPackageReady` aşamasındaki **uygulamanın etkin classloader'ı** kullanılır.
-- Yöntemleri yalnızca sınıf adına göre değil `java.lang.reflect.Method` nesnesine göre izleyerek farklı classloader'ların aynı adlı yöntemlerini birbirine karıştırmaz.
-- Türkçe Q, Shift, AltGr ve düzenleme tuşlarının v0.6'dan taşınan seçici işlenişi korunur.
-- Modül yükleme ve tuş olayları `GboardMirrorTR` Android logcat etiketine yazılır; karakter içeriği loglanmaz.
+**Final dağıtım, çalışan RC8 APK'sıyla byte-byte aynıdır.** Bu nedenle modülün davranışı veya imzası değişmemiştir. APK içinde eski `1.0.0-modern-api102-rc8` dahili sürüm adı ve `versionCode=108` bulunması beklenen bir durumdur. GitHub'daki Final dağıtım etiketi `v1.0.0`'dır.
 
-**Şu an bu bir kök neden hipotezidir; cihaz loglarıyla doğrulanması gerekir.**
+## Özellikler
 
-## Geliştirme ve derleme
+- Türkçe Q harfleri: `ğ ü ş ı ö ç` ve büyük harfleri
+- Standart harfler, özel karakterler, Shift, AltGr, özellikle Shift ile `?`
+- Ctrl+A / Ctrl+C / Ctrl+V / Ctrl+X
+- Backspace ve olağan düzenleme tuşları
+- Modern API 102, Gboard `aeht.onKeyDown/onKeyUp` kancaları
+- Sadece Xiaomi mirror klavye olaylarında giriş düzeltmesi (sanal cihaz kimliği `-100`)
 
-- `io.github.libxposed:api:102.0.0`, `compileOnly`
-- `META-INF/xposed/java_init.list`, `scope.list`, `module.prop`
-- JDK 17, Gradle 8.9, Android SDK 35
-- `gradle :app:assembleDebug`
-- Hedef uygulama ve modül kapsamı: `com.google.android.inputmethod.latin`
+## Kurulum
 
-Cihaz testi sırasında, yalnızca RC7 yüklüyken şu komut tanılama için kullanılabilir:
+1. **[Final APK](https://github.com/mahmutuslu/Gboard-Mirror-Turkish-Q/releases/download/v1.0.0/Gboard-Mirror-Turkish-Q-v1.0.0-Final.apk)** dosyasını indirin ve yükleyin.
+2. LSPosed'da etkinleştirip `com.google.android.inputmethod.latin` kapsamını seçin.
+3. Gboard varsayılan klavyeyken telefonu yeniden başlatın ve Xiaomi PC Manager ekran yansıtmasında test edin.
 
-```powershell
-& 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
-```
+RC8 zaten yüklü ve çalışıyorsa tekrar yüklemeniz gerekmez; Final'deki APK birebir aynıdır.
 
-**Not:** GitHub Actions derleme başarısı, cihazda ekran yansıtma klavyesinin çalıştığını kanıtlamaz.
+## Geliştirme
 
-## Shift + ? düzeltmesi (RC7)
+- Paket adı: `com.example.gboardmirrortrv06`
+- Hedef: `com.google.android.inputmethod.latin`
+- libxposed bağımlılığı: `io.github.libxposed:api:102.0.0`
+- Android SDK 35, JDK 17, Gradle 8.9
+- Kaynak: `app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java`
+- Tanılama: `adb logcat -d -v time -s GboardMirrorTR:V`
 
-Sadece Shift sonrası gelen `KEYCODE_UNKNOWN(0)` için geçici soru işareti eşlemesi ve ayrıntılı meta/scan tanılama eklendi. Diğer karakter işleme yolları değiştirilmedi. Cihazda doğrulanmadığı için bu ön sürümdür.
-
-## RC8 — Ctrl+V doğrudan yapıştırma
-
-RC7'de Ctrl+A/C/X doğrudan desteklenirken Ctrl+V, Gboard'un orijinal yoluna bırakılıyordu. RC8, Ctrl+V için `performContextMenuAction(android.R.id.paste)` ekler. RC7'de çalışan Türkçe Q, Shift+? ve Backspace kodları değiştirilmedi; RC8 cihaz testi gereklidir.
+Final APK yeniden derlenerek üretilmez; çalıştığı doğrulanan RC8 sürümünün SHA-256 bütünlük kontrolünden geçmiş kopyası yayımlanır. Gelecekte yeniden derlenecek güncellemeler, mevcut APK'yla imza uyumluluğu açısından ayrıca değerlendirilmelidir.
