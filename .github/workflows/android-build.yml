@@ -1,8 +1,8 @@
-name: Build modern libxposed API 102 RC3 APK
+name: Build modern libxposed API 102 RC4 APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/modern-api102-aeht-rc4']
   workflow_dispatch:
 
 permissions:
@@ -31,8 +31,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build modern RC3 APK
+      - name: Build modern RC4 APK
         run: gradle --no-daemon :app:assembleDebug
+      - name: Verify recovered v0.6 hook target
+        run: |
+          grep -F 'Class.forName("aeht", false, loader)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
+          ! grep -F 'installTarget(InputMethodService.class' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
       - name: Verify modern module metadata and APK
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
@@ -47,15 +51,15 @@ jobs:
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC3
+          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC4
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Publish RC3 pre-release after successful build
+      - name: Publish RC4 pre-release after successful build
         if: github.repository == 'mahmutuslu/Gboard-Mirror-Turkish-Q' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-modern-api102-rc3
-          name: Gboard Mirror Turkish Q — Modern API 102 RC3 (test)
+          tag_name: v1.0.0-modern-api102-rc4
+          name: Gboard Mirror Turkish Q — Modern API 102 RC4 (test)
           prerelease: true
           make_latest: false
           body_path: RELEASE_NOTES_TR.md
