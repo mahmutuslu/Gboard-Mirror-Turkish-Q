@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Native libxposed API 102 port of user-supplied Gboard Mirror Turkish Q v0.6.
- * Reimplemented behavior from v0.6 DEX. RC2 is untested on a physical phone.
+ * Reimplemented behavior from v0.6 DEX. RC5 is unverified on-device; v0.6 was verified working.
  */
 public final class MainModule extends XposedModule {
 
@@ -26,7 +26,7 @@ public final class MainModule extends XposedModule {
     private static final int MIRROR_DEVICE_ID = -100;
     private final WeakHashMap<Object, SparseBooleanArray> consumedKeys = new WeakHashMap<>();
     private final AtomicInteger eventLogs = new AtomicInteger();
-    private final java.util.Set<String> hookedMethods = new java.util.HashSet<>();
+    private final java.util.Set<Method> hookedMethods = new java.util.HashSet<>();
     private final java.util.List<HookHandle> liveHooks = new java.util.ArrayList<>();
 
     private void trace(int level, String message) {
@@ -40,37 +40,52 @@ public final class MainModule extends XposedModule {
 
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
-        trace(Log.INFO, "RC4 onModuleLoaded process=" + param.getProcessName());
+        trace(Log.INFO, "RC5 onModuleLoaded process=" + param.getProcessName());
     }
 
     @Override
     public void onPackageLoaded(PackageLoadedParam param) {
+        // The default loader can be replaced by AppComponentFactory later.
+        // Do NOT install application hooks here: the legacy v0.6 hook targets
+        // the loader which really owns the running Gboard IME class.
         if (GBOARD.equals(param.getPackageName())) {
-            install("onPackageLoaded", param.getDefaultClassLoader());
+            trace(Log.INFO, "RC5 PACKAGE LOADED (waiting for ready loader)"
+                    + " defaultLoader=" + describeLoader(param.getDefaultClassLoader()));
         }
     }
 
     @Override
     public void onPackageReady(PackageReadyParam param) {
         if (GBOARD.equals(param.getPackageName())) {
-            install("onPackageReady", param.getClassLoader());
+            ClassLoader actual = param.getClassLoader();
+            ClassLoader early = param.getDefaultClassLoader();
+            trace(Log.INFO, "RC5 PACKAGE READY activeLoader=" + describeLoader(actual)
+                    + " differentFromDefault=" + (actual != early));
+            install("onPackageReady", actual);
         }
+    }
+
+    private static String describeLoader(ClassLoader loader) {
+        if (loader == null) return "null";
+        return loader.getClass().getName() + "@"
+                + Integer.toHexString(System.identityHashCode(loader));
     }
 
     private synchronized void install(String stage, ClassLoader loader) {
         if (loader == null) {
-            trace(Log.WARN, "RC4: classloader missing in " + stage);
+            trace(Log.WARN, "RC5: classloader missing in " + stage);
             return;
         }
         try {
             // The verified v0.6 DEX hooks "aeht" rather than InputMethodService.
             Class<?> target = Class.forName("aeht", false, loader);
-            trace(Log.INFO, "RC4 original target found: " + target.getName());
+            trace(Log.INFO, "RC5 original target FOUND: " + target.getName()
+                    + " definingLoader=" + describeLoader(target.getClassLoader()));
             installTarget(target, stage);
         } catch (ClassNotFoundException error) {
-            trace(Log.WARN, "RC4 aeht not found in " + stage);
+            trace(Log.WARN, "RC5 aeht not found in " + stage);
         } catch (Throwable error) {
-            traceError("RC4 aeht lookup failed", error);
+            traceError("RC5 aeht lookup failed", error);
         }
     }
 
@@ -79,26 +94,31 @@ public final class MainModule extends XposedModule {
             final boolean down = action == 0;
             final String methodName = down ? "onKeyDown" : "onKeyUp";
             final String key = owner.getName() + "#" + methodName;
-            if (hookedMethods.contains(key)) continue;
             final Method method;
             try {
                 method = owner.getDeclaredMethod(methodName, int.class, KeyEvent.class);
             } catch (NoSuchMethodException noOverride) {
                 continue;
             }
+            if (hookedMethods.contains(method)) {
+                trace(Log.INFO, "RC5 SAME METHOD already hooked: " + key
+                        + " classLoader=" + describeLoader(owner.getClassLoader()));
+                continue;
+            }
             try {
                 HookHandle handle = hook(method)
-                        .setId("gboard-tr-rc3-" + key)
+                        .setId("gboard-tr-rc5-" + key)
                         .intercept(chain -> {
                             Object receiver = chain.getThisObject();
                             int code = (Integer) chain.getArg(0);
                             KeyEvent event = (KeyEvent) chain.getArg(1);
                             if (down) {
-                                if (isMirror(event) && eventLogs.getAndIncrement() < 60) {
-                                    trace(Log.INFO, "RC4 KEYDOWN code=" + code
+                                if (event != null && eventLogs.getAndIncrement() < 64) {
+                                    trace(Log.INFO, "RC5 KEYDOWN code=" + code
                                             + " device=" + event.getDeviceId()
                                             + " source=0x" + Integer.toHexString(event.getSource())
                                             + " unicode=" + event.getUnicodeChar()
+                                            + " mirror=" + isMirror(event)
                                             + " method=" + key);
                                 }
                                 if (receiver instanceof InputMethodService && isMirror(event)) {
@@ -113,7 +133,7 @@ public final class MainModule extends XposedModule {
                                             return result;
                                         }
                                     } catch (Throwable error) {
-                                        traceError("RC4 handleDown failed code=" + code, error);
+                                        traceError("RC5 handleDown failed code=" + code, error);
                                     }
                                 }
                             } else if (receiver instanceof InputMethodService && isMirror(event)) {
@@ -133,10 +153,11 @@ public final class MainModule extends XposedModule {
                             return chain.proceed();
                         });
                 liveHooks.add(handle);
-                hookedMethods.add(key);
-                trace(Log.INFO, "RC4 HOOK ACTIVE " + stage + " " + key);
+                hookedMethods.add(method);
+                trace(Log.INFO, "RC5 HOOK ACTIVE " + stage + " " + key
+                        + " definingLoader=" + describeLoader(owner.getClassLoader()));
             } catch (Throwable error) {
-                traceError("RC4 HOOK FAILED " + stage + " " + key, error);
+                traceError("RC5 HOOK FAILED " + stage + " " + key, error);
             }
         }
     }

@@ -1,23 +1,33 @@
-# Gboard Mirror Turkish Q — Modern Xposed API 102
+# Gboard Mirror Turkish Q — modern libxposed API 102
 
-Modern `libxposed` API 102 tabanlı Gboard ekran yansıtma Türkçe Q tuş köprüsünün açık kaynak **RC1 deneme sürümü**.
+Xiaomi PC Manager ekran yansıtmasındaki fiziksel Türkçe Q klavye girişini Gboard'da işlemek için libxposed API 102'ye taşıma projesi.
 
-**Durum:** Kaynak proje GitHub'a aktarıldı; modern APK'nın GitHub Actions ile derlenmesi ve Xiaomi 15 Ultra üzerinde test edilmesi gerekiyor. Önceki legacy API uyumluluk APK'sının çalışması modern sürümün doğrulandığı anlamına gelmez.
+**Çalışan referans:** v0.6 legacy APK. Kullanıcı bunu Xiaomi 15 Ultra ve PC Manager 6.0.2.30'da doğruladı.
 
-## Teknik bilgiler
-- Hedef: `com.google.android.inputmethod.latin` (Gboard)
-- Modern giriş: `META-INF/xposed/java_init.list`
-- `io.github.libxposed:api:102.0.0` (`compileOnly`)
-- Giriş sınıfı: `com.example.gboardmirrorpassthrough.MainModule`
-- Klavye: Türkçe Q / ekran yansıtma olayları (`deviceId=-100`)
+**Modern sürüm:** RC1–RC4 cihaz testinde başarısız. RC5 cihazda henüz doğrulanmadı; **Final değildir**. Eski v0.6'yı saklayın.
 
-## Derleme
-JDK 17, Android SDK 35 ve Gradle 8.9 ile: `gradle :app:assembleDebug`.
+## RC5'te denenen düzeltme
 
-GitHub Actions derleme başarılı olursa bir **ön sürüm** oluşturmak üzere yapılandırılmıştır. Derleme hatalıysa Release oluşturulmamalıdır.
+- Gerçek eski hedef Gboard `aeht.onKeyDown/onKeyUp` (v0.6 DEX kodunda doğrulandı).
+- Modern API 102'de `onPackageLoaded` aşamasındaki **erken varsayılan classloader** yerine `onPackageReady` aşamasındaki **uygulamanın etkin classloader'ı** kullanılır.
+- Yöntemleri yalnızca sınıf adına göre değil `java.lang.reflect.Method` nesnesine göre izleyerek farklı classloader'ların aynı adlı yöntemlerini birbirine karıştırmaz.
+- Türkçe Q, Shift, AltGr ve düzenleme tuşlarının v0.6'dan taşınan seçici işlenişi korunur.
+- Modül yükleme ve tuş olayları `GboardMirrorTR` Android logcat etiketine yazılır; karakter içeriği loglanmaz.
 
-## Test notları
-Orijinal v0.6 APK'sından gözlemlenen davranışlar yeniden uygulanmıştır; kaynaklar orijinal proje kaynakları değildir. Türkçe karakterler, AltGr ve kısayollar gerçek cihazda doğrulanmalıdır. Kurulu çalışan eski modülü yedekleyin; yeni debug imzası mevcut sürümün üzerine kurulmayı engelleyebilir.
+**Şu an bu bir kök neden hipotezidir; cihaz loglarıyla doğrulanması gerekir.**
 
-## Lisans
-Orijinal APK ve varsa üçüncü taraf kaynaklarının hakları ilgili sahiplerine aittir; bu depoda yalnızca yeniden yazılmış uygulama kodu ve derleme dosyaları bulunur.
+## Geliştirme ve derleme
+
+- `io.github.libxposed:api:102.0.0`, `compileOnly`
+- `META-INF/xposed/java_init.list`, `scope.list`, `module.prop`
+- JDK 17, Gradle 8.9, Android SDK 35
+- `gradle :app:assembleDebug`
+- Hedef uygulama ve modül kapsamı: `com.google.android.inputmethod.latin`
+
+Cihaz testi sırasında, yalnızca RC5 yüklüyken şu komut tanılama için kullanılabilir:
+
+```powershell
+& 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
+```
+
+**Not:** GitHub Actions derleme başarısı, cihazda ekran yansıtma klavyesinin çalıştığını kanıtlamaz.

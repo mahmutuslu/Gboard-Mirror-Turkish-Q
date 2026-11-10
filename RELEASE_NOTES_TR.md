@@ -1,23 +1,22 @@
-# Gboard Mirror Turkish Q — Modern API 102 RC4
+# Modern libxposed API 102 — RC5 test paketi
 
-**Test sürümü (pre-release). RC4 henüz kullanıcı telefonunda doğrulanmadı.**
+**Final değildir.** Xiaomi 15 Ultra'da modern RC1–RC4 çalışmadı. Çalışan ve korunması gereken referans, eski legacy v0.6 APK'sıdır.
 
-## Çalışan v0.6 ile yapılan somut karşılaştırma
-Orijinal v0.6 APK'sının `classes2.dex` kodu incelendi. `MainHook.handleLoadPackage()` içinde gerçek Gboard kancası `XposedHelpers.findAndHookMethod("aeht", classLoader, "onKeyDown"/"onKeyUp")` olarak kurulu. Önceki RC1–RC3 derlemeleri yanlışlıkla Android'in genel `InputMethodService` yöntemini ve başka Gboard sınıf adlarını kancalıyordu. Bu durum ekran yansıtma tuşlarını neden kaçırdıklarını açıklıyor.
+## Kanıta dayalı değişiklik
 
-RC4, Gboard classloader'ındaki `aeht` sınıfına modern `libxposed:api:102.0.0` kancası kuruyor. v0.6'daki Türkçe Q, AltGr, Shift, silme, Ctrl+A/C/X ve Xiaomi Shift+UNKNOWN işleyişi geri taşındı. Normal ASCII harflerini Gboard'un kendi yöntemine bırakıyor.
+RC4 kancaları `Set<String>` ile yalnızca `aeht#onKeyDown` gibi yöntem adları üzerinden izliyor ve `onPackageLoaded` esnasında erken varsayılan classloader ile kanca kurmayı deniyordu. Resmî libxposed 102 yaşam döngüsüne göre `onPackageReady` anındaki gerçek uygulama classloader'ı farklı olabilir. Bu durumda RC4, sınıf adı aynı diye gerçek yönteme kanca kurmayı atlayabilir.
 
-## Kurulum ve test
-1. **Çalışan v0.6 APK'sını saklayın.** RC4 debug sertifikası farklı olduğundan eskisini kaldırmak gerekebilir.
-2. RC4'ü kurun, LSPosed'de etkinleştirin ve kapsam olarak **Gboard** (`com.google.android.inputmethod.latin`) seçin.
-3. Gboard'u yeniden başlatın. Xiaomi PC Manager 6.0.2.30 ekran yansıtmasında Windows fiziksel Türkçe Q klavyeyle yazmayı deneyin.
-4. Sorun varsa aşağıdaki hedefli logu gönderin:
+RC5:
+- Yalnızca `onPackageReady` ve gerçek `getClassLoader()` kullanır.
+- Tekilleştirmeyi yöntem adı yerine `Method` nesnesine göre yapar.
+- Eski v0.6 DEX'inde doğrulanan Gboard `aeht.onKeyDown/onKeyUp` yöntemlerini hedefler.
+- Klavye olaylarının kancaya girip girmediğini ilk 64 olay için `GboardMirrorTR` logcat etiketinde gösterir (metin içerikleri kaydedilmez).
+- Eski v0.6 tuş haritasını ve seçici Gboard orijinaline devam etme işleyişini korur.
+
+**Telefon üzerinde test edilmemiştir.** Mevcut çalışan v0.6'nın değiştirilmesi zorunlu değildir.
 
 ```powershell
 & 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
 ```
 
-Başarılı kanca kurulumu `RC4 HOOK ACTIVE ... aeht#onKeyDown`, tuş sevki `RC4 KEYDOWN ... device=-100` olarak görünür.
-
-### Sürüm durumu
-GitHub Actions Android SDK/Gradle derlemesi ve `META-INF/xposed` kontrolü başarılı. **Xiaomi 15 Ultra'da RC4 çalışma testi henüz yapılmadı. Bu sürüm final değildir.**
+Beklenen yükleme kaydı: `RC5 HOOK ACTIVE ... aeht#onKeyDown`. Aksi durumda classloader veya Xposed kancası başarısız olmuştur.
