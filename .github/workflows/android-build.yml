@@ -1,4 +1,4 @@
-name: Build modern libxposed API 102 RC1 APK
+name: Build modern libxposed API 102 RC2 APK
 
 on:
   push:
@@ -31,24 +31,31 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build modern RC1 APK
+      - name: Build modern RC2 APK
         run: gradle --no-daemon :app:assembleDebug
-      - name: Verify built APK
+      - name: Verify modern module metadata and APK
         run: |
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/java_init.list'
+          unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/module.prop'
+          unzip -Z1 "$APK" | grep -Fx 'META-INF/xposed/scope.list'
+          unzip -p "$APK" META-INF/xposed/java_init.list
+          unzip -p "$APK" META-INF/xposed/module.prop
+          unzip -p "$APK" META-INF/xposed/scope.list
+          sha256sum "$APK"
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC1
+          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC2
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Publish RC1 pre-release after successful build
+      - name: Publish RC2 pre-release after successful build
         if: github.repository == 'mahmutuslu/Gboard-Mirror-Turkish-Q' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-modern-api102-rc1
-          name: Gboard Mirror Turkish Q — Modern API 102 RC1 (test)
+          tag_name: v1.0.0-modern-api102-rc2
+          name: Gboard Mirror Turkish Q — Modern API 102 RC2 (test)
           prerelease: true
           make_latest: false
           body_path: RELEASE_NOTES_TR.md

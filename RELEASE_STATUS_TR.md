@@ -1,11 +1,5 @@
-# Sürüm durumu
+# Modern API 102 RC2 Durumu
 
-- **Proje:** Gboard Mirror Turkish Q
-- **Sürüm:** v1.0.0-modern-api102-rc1 (test / pre-release)
-- **Altyapı:** Gerçek modern libxposed API 102
-- **GitHub kaynakları:** Yüklendi
-- **Derleme:** GitHub Actions sonucu bekleniyor; yalnızca başarılıysa APK oluşacak
-- **Modern APK cihaz testi:** Henüz yapılmadı
-- **Final etiket:** Modern APK derlenip cihazda doğrulanmadan verilmemeli
-
-Kullanıcının daha önce çalıştığını doğruladığı APK, eski API'den uyarlanan legacy sürümdür; modern RC1 değildir.
+GitHub Actions derlemesi başarılı olursa RC2 APK bir GitHub ön sürümüne eklenecek.
+Bu APK cihazda doğrulanana kadar Final olarak etiketlenmeyecek.
+RC1 çalışmadı; RC2, v0.6'nın DEX'te bulunan Türkçe Q keycode haritasını ve tanılama loglarını içerir.
