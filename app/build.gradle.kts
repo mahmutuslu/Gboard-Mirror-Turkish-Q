@@ -5,7 +5,7 @@ android {
     namespace = "com.example.gboardmirrorpassthrough"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.example.gboardmirrorpassthrough"
+        applicationId = "com.example.gboardmirrortrv06"
         minSdk = 29
         targetSdk = 32
         versionCode = 103
