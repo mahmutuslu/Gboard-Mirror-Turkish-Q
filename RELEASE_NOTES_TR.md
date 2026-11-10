@@ -1,36 +1,26 @@
-# Gboard Mirror Turkish Q — Modern API 102 RC6
+# Gboard Mirror Turkish Q — Modern API 102 RC7
 
-**Ön sürüm / deneysel. RC6, Xiaomi 15 Ultra üzerinde henüz test edilmedi.**
+**Deneysel ön sürüm. RC7 henüz Xiaomi 15 Ultra cihazında doğrulanmadı.**
 
-## Kullanıcının RC5 logu ile doğrulanan durum
+## RC6 sonucuyla doğrulananlar
 
-- `aeht.onKeyDown` modern libxposed API 102 kancası aktif.
-- PC Manager ekran yansıtmasındaki tuşlar `device=-100`, `source=0x101` ile kancaya ulaşıyor.
-- Harfler (`code=32` D, `code=40` L), noktalama (`code=69` -), Backspace (`code=67`) ve Shift (`code=59`) gözlemlendi.
-- Klavye girişinin nerede kesildiği henüz bilinmiyor; RC5 yalnızca hook girişini logluyordu.
+- Modern API 102 ile Gboard `aeht.onKeyDown/onKeyUp` kancaları aktif.
+- Xiaomi PC Manager üzerinden normal harfler ve Türkçe Q karakterleri çalışıyor; `commitText` `accepted=true`.
+- Kullanıcının 10 Kasım 2026 logları `Shift=59` ile beraber `KEYCODE_UNKNOWN=0 unicode=0` içeriyor; bu olayların Shift+? ile ilişkili olması kuvvetli olasılık ama henüz skan kodu doğrulanmadı.
 
-## RC6 düzeltmesi ve tanılama
+## RC7 tek hedefli değişiklik
 
-Orijinal v0.6 DEX kodu, normal harflerde Gboard'un kendi `onKeyDown` yöntemine devam ediyor. RC5 aynı mantığı koruyordu ancak kullanıcı testinde normal harfler yazılmadı. RC6, **normal basılabilir Unicode karakterleri doğrudan `InputConnection.commitText` ile yazar ve başarılıysa Gboard'un orijinal yöntemine gitmeden tuşu tüketir**. Türkçe özel tuşlar, Shift/AltGr, düzenleme ve silme kodu korunur.
+- Shift tuşunun basılı durumunu Gboard IME nesnesine bağlı, kısa süreli (1800 ms) tutar ve key-up ile temizler.
+- Yalnızca Xiaomi yansıtmasının `deviceId=-100` tuşlarında; Shift ile beraber gelen `KEYCODE_UNKNOWN, unicode=0, repeat=0` olayını `?` karakterine dönüştürmeyi dener.
+- CTRL, ALT, META kısayollarına dokunmaz. Shift olmadan gelen bilinmeyen tuşları Gboard'a bırakır.
+- Bilinmeyen tuş için `scanCode, flags, metaState, repeatCount, shiftRecent` tanı bilgilerini loglar, metin alanının içeriğini kaydetmez.
+- Diğer harfler, Türkçe Q, silme ve mevcut tuş eşleme kodları RC6 ile aynıdır.
 
-RC6 ayrıca tuşun Gboard IME nesnesinden mi geldiğini, aktif InputConnection bulunup bulunmadığını, `commitText` sonucunu ve yerel Gboard yöntemine devam edildiğinde dönüş değerini kaydeder. Kayıtlara yazılan karakterin metni alınmaz; sadece kod ve işlem sonucu görünür.
+## Test
 
-Bu çözüm *v0.6'nın birebir portu değil*, modern interceptor uygulamasında karşılaşılan regresyonu gidermeyi hedefleyen kontrollü farklı davranıştır.
+1. Çalışan eski v0.6 APK'sını saklayın.
+2. RC7 APK'yı kurun ve **telefonu yeniden başlatın** (`autoHotReload=false`).
+3. Gboard varsayılan ve LSPosed kapsamında seçili iken ekran yansıtmasında `a`, `*`, `Shift+*` (Türkçe Q soru işareti), `ğüşiöçı` ve Backspace deneyin.
+4. Gerekirse `adb logcat -d -v time -s GboardMirrorTR:V` ile `RC7 QUESTION COMMIT` ve `RC7 UNKNOWN KEYDOWN` kayıtlarını kontrol edin.
 
-**Çalışan v0.6 APK mutlaka saklanmalı. RC6 final değil.**
-
-## Yükleme ve teşhis
-
-1. RC6'yı yalnızca test için kurun; imza çakışırsa eski modülü kaldırmak gerekebilir.
-2. LSPosed kapsamında `com.google.android.inputmethod.latin` seçili olsun. Gboard yeniden başlatılsın.
-3. Ekran yansıtma metin alanında `abc123ğüşiöçı` yazmayı deneyin.
-
-```powershell
-& 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
-```
-
-`RC6 PRINTABLE COMMIT code=... accepted=true` görünmesi karakterin InputConnection tarafından kabul edildiğini gösterir; ekranda gerçekten yazıldığı ayrıca test edilmeli.
-
-### Durum
-
-Android/Gradle CI derlemesi, giriş metadata doğrulaması ve kaynak kontrolü yapılmış olsa bile cihaz testi tamamlanmadan `Final` değil.
+**Bu sürüm test içindir, Final değildir.**

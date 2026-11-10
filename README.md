@@ -4,9 +4,9 @@ Xiaomi PC Manager ekran yansıtmasındaki fiziksel Türkçe Q klavye girişini G
 
 **Çalışan referans:** v0.6 legacy APK. Kullanıcı bunu Xiaomi 15 Ultra ve PC Manager 6.0.2.30'da doğruladı.
 
-**Modern sürüm:** RC1–RC4 cihaz testinde başarısız. RC6 cihazda henüz doğrulanmadı; **Final değildir**. Eski v0.6'yı saklayın.
+**Modern sürüm:** RC1–RC4 cihaz testinde başarısız. RC7 cihazda henüz doğrulanmadı; **Final değildir**. Eski v0.6'yı saklayın.
 
-## RC6'te denenen düzeltme
+## RC7'te denenen düzeltme
 
 - Gerçek eski hedef Gboard `aeht.onKeyDown/onKeyUp` (v0.6 DEX kodunda doğrulandı).
 - Modern API 102'de `onPackageLoaded` aşamasındaki **erken varsayılan classloader** yerine `onPackageReady` aşamasındaki **uygulamanın etkin classloader'ı** kullanılır.
@@ -24,10 +24,14 @@ Xiaomi PC Manager ekran yansıtmasındaki fiziksel Türkçe Q klavye girişini G
 - `gradle :app:assembleDebug`
 - Hedef uygulama ve modül kapsamı: `com.google.android.inputmethod.latin`
 
-Cihaz testi sırasında, yalnızca RC6 yüklüyken şu komut tanılama için kullanılabilir:
+Cihaz testi sırasında, yalnızca RC7 yüklüyken şu komut tanılama için kullanılabilir:
 
 ```powershell
 & 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
 ```
 
 **Not:** GitHub Actions derleme başarısı, cihazda ekran yansıtma klavyesinin çalıştığını kanıtlamaz.
+
+## Shift + ? düzeltmesi (RC7)
+
+Sadece Shift sonrası gelen `KEYCODE_UNKNOWN(0)` için geçici soru işareti eşlemesi ve ayrıntılı meta/scan tanılama eklendi. Diğer karakter işleme yolları değiştirilmedi. Cihazda doğrulanmadığı için bu ön sürümdür.

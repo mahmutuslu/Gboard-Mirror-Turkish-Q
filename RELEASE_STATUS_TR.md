@@ -1,8 +1,6 @@
-# Gboard Mirror Turkish Q — RC6 durum
+# Gboard Mirror Turkish Q — RC7 durum
 
-- Çalışan referans: legacy v0.6 (kullanıcı tarafından doğrulandı).
-- Modern RC1–RC5: ekran yansıtma klavyesinde çalışmadı.
-- RC5 logu: `aeht#onKeyDown`, `device=-100`, `mirror=true` görüldü.
-- RC6: `InputConnection` doğrudan basılabilir karakter commit + karar loglama.
-- CI: GitHub Actions'ta derleme ile doğrulanmalı.
-- Gerçek cihaz testi: henüz yapılmadı; final değil.
+- Referans: legacy v0.6 kullanıcı cihazında çalıştı.
+- RC6: Modern API 102 kancaları aktif, normal harfler ve Türkçe Q girişleri kullanıcı tarafından çalışır doğrulandı.
+- Eksik: Shift + ? tuşu, logda Shift(59) ardından UNKNOWN(0) olarak görünüyor.
+- RC7: Shift durumuna dayalı dar kapsamlı UNKNOWN -> '?' denemesi ve scan/meta/flags logu; **cihaz testi bekleniyor**, Final değil.
