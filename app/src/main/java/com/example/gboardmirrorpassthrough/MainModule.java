@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Native libxposed API 102 port of user-supplied Gboard Mirror Turkish Q v0.6.
- * Reimplemented behavior from v0.6 DEX. RC5 is unverified on-device; v0.6 was verified working.
+ * Reimplemented behavior from v0.6 DEX. RC6 is unverified on-device; v0.6 was verified working.
  */
 public final class MainModule extends XposedModule {
 
@@ -26,6 +26,7 @@ public final class MainModule extends XposedModule {
     private static final int MIRROR_DEVICE_ID = -100;
     private final WeakHashMap<Object, SparseBooleanArray> consumedKeys = new WeakHashMap<>();
     private final AtomicInteger eventLogs = new AtomicInteger();
+    private final AtomicInteger decisionLogs = new AtomicInteger();
     private final java.util.Set<Method> hookedMethods = new java.util.HashSet<>();
     private final java.util.List<HookHandle> liveHooks = new java.util.ArrayList<>();
 
@@ -40,7 +41,7 @@ public final class MainModule extends XposedModule {
 
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
-        trace(Log.INFO, "RC5 onModuleLoaded process=" + param.getProcessName());
+        trace(Log.INFO, "RC6 onModuleLoaded process=" + param.getProcessName());
     }
 
     @Override
@@ -49,7 +50,7 @@ public final class MainModule extends XposedModule {
         // Do NOT install application hooks here: the legacy v0.6 hook targets
         // the loader which really owns the running Gboard IME class.
         if (GBOARD.equals(param.getPackageName())) {
-            trace(Log.INFO, "RC5 PACKAGE LOADED (waiting for ready loader)"
+            trace(Log.INFO, "RC6 PACKAGE LOADED (waiting for ready loader)"
                     + " defaultLoader=" + describeLoader(param.getDefaultClassLoader()));
         }
     }
@@ -59,7 +60,7 @@ public final class MainModule extends XposedModule {
         if (GBOARD.equals(param.getPackageName())) {
             ClassLoader actual = param.getClassLoader();
             ClassLoader early = param.getDefaultClassLoader();
-            trace(Log.INFO, "RC5 PACKAGE READY activeLoader=" + describeLoader(actual)
+            trace(Log.INFO, "RC6 PACKAGE READY activeLoader=" + describeLoader(actual)
                     + " differentFromDefault=" + (actual != early));
             install("onPackageReady", actual);
         }
@@ -73,19 +74,19 @@ public final class MainModule extends XposedModule {
 
     private synchronized void install(String stage, ClassLoader loader) {
         if (loader == null) {
-            trace(Log.WARN, "RC5: classloader missing in " + stage);
+            trace(Log.WARN, "RC6: classloader missing in " + stage);
             return;
         }
         try {
             // The verified v0.6 DEX hooks "aeht" rather than InputMethodService.
             Class<?> target = Class.forName("aeht", false, loader);
-            trace(Log.INFO, "RC5 original target FOUND: " + target.getName()
+            trace(Log.INFO, "RC6 original target FOUND: " + target.getName()
                     + " definingLoader=" + describeLoader(target.getClassLoader()));
             installTarget(target, stage);
         } catch (ClassNotFoundException error) {
-            trace(Log.WARN, "RC5 aeht not found in " + stage);
+            trace(Log.WARN, "RC6 aeht not found in " + stage);
         } catch (Throwable error) {
-            traceError("RC5 aeht lookup failed", error);
+            traceError("RC6 aeht lookup failed", error);
         }
     }
 
@@ -101,7 +102,7 @@ public final class MainModule extends XposedModule {
                 continue;
             }
             if (hookedMethods.contains(method)) {
-                trace(Log.INFO, "RC5 SAME METHOD already hooked: " + key
+                trace(Log.INFO, "RC6 SAME METHOD already hooked: " + key
                         + " classLoader=" + describeLoader(owner.getClassLoader()));
                 continue;
             }
@@ -113,12 +114,18 @@ public final class MainModule extends XposedModule {
                             int code = (Integer) chain.getArg(0);
                             KeyEvent event = (KeyEvent) chain.getArg(1);
                             if (down) {
-                                if (event != null && eventLogs.getAndIncrement() < 64) {
-                                    trace(Log.INFO, "RC5 KEYDOWN code=" + code
+                                if (isMirror(event) && eventLogs.getAndIncrement() < 100) {
+                                    trace(Log.INFO, "RC6 KEYDOWN code=" + code
                                             + " device=" + event.getDeviceId()
                                             + " source=0x" + Integer.toHexString(event.getSource())
                                             + " unicode=" + event.getUnicodeChar()
                                             + " mirror=" + isMirror(event)
+                                            + " receiver=" + (receiver == null ? "null"
+                                                : receiver.getClass().getName())
+                                            + " isIme=" + (receiver instanceof InputMethodService)
+                                            + " conn=" + (receiver instanceof InputMethodService
+                                                && ((InputMethodService) receiver)
+                                                    .getCurrentInputConnection() != null)
                                             + " method=" + key);
                                 }
                                 if (receiver instanceof InputMethodService && isMirror(event)) {
@@ -133,8 +140,11 @@ public final class MainModule extends XposedModule {
                                             return result;
                                         }
                                     } catch (Throwable error) {
-                                        traceError("RC5 handleDown failed code=" + code, error);
+                                        traceError("RC6 handleDown failed code=" + code, error);
                                     }
+                                } else if (isMirror(event) && down) {
+                                    trace(Log.WARN, "RC6 KEYDOWN has non-IME receiver code="
+                                            + code + " receiver=" + receiver);
                                 }
                             } else if (receiver instanceof InputMethodService && isMirror(event)) {
                                 synchronized (consumedKeys) {
@@ -150,14 +160,20 @@ public final class MainModule extends XposedModule {
                                     }
                                 }
                             }
-                            return chain.proceed();
+                            Object originalResult = chain.proceed();
+                            if (down && isMirror(event)
+                                    && decisionLogs.getAndIncrement() < 110) {
+                                trace(Log.INFO, "RC6 NATIVE RESULT code=" + code
+                                        + " value=" + originalResult);
+                            }
+                            return originalResult;
                         });
                 liveHooks.add(handle);
                 hookedMethods.add(method);
-                trace(Log.INFO, "RC5 HOOK ACTIVE " + stage + " " + key
+                trace(Log.INFO, "RC6 HOOK ACTIVE " + stage + " " + key
                         + " definingLoader=" + describeLoader(owner.getClassLoader()));
             } catch (Throwable error) {
-                traceError("RC5 HOOK FAILED " + stage + " " + key, error);
+                traceError("RC6 HOOK FAILED " + stage + " " + key, error);
             }
         }
     }
@@ -206,9 +222,36 @@ public final class MainModule extends XposedModule {
         }
         if (ordinaryShortcut(e)) return null;
         String text = mappedText(code, e, isAltGr(e));
-        if (text != null && connection != null && connection.commitText(text, 1)) return true;
-        // Preserve native Gboard handling for normal printable keys.
+        if (text != null) {
+            boolean committed = connection != null && connection.commitText(text, 1);
+            if (decisionLogs.getAndIncrement() < 110) {
+                trace(Log.INFO, "RC6 MAPPED COMMIT code=" + code
+                        + " connection=" + (connection != null)
+                        + " accepted=" + committed);
+            }
+            if (committed) return true;
+        }
         if (!passPrintable(e) || passEditingKey(code)) return false;
+
+        // RC6 fell through to Gboard's original handler for ordinary
+        // printable keys, despite the device emitting valid unicode here.
+        // In RC6, commit the already-decoded character directly, once.
+        // Do not call the original method when commit succeeds.
+        int cp = e.getUnicodeChar();
+        if (connection != null && cp >= 32 && Character.isValidCodePoint(cp)
+                && !Character.isISOControl(cp)) {
+            boolean committed = connection.commitText(
+                    new String(Character.toChars(cp)), 1);
+            if (decisionLogs.getAndIncrement() < 110) {
+                trace(Log.INFO, "RC6 PRINTABLE COMMIT code=" + code
+                        + " connection=true accepted=" + committed);
+            }
+            if (committed) return true;
+        } else if (decisionLogs.getAndIncrement() < 110) {
+            trace(Log.WARN, "RC6 PRINTABLE NO CONNECTION/UNICODE code="
+                    + code + " conn=" + (connection != null)
+                    + " unicode=" + cp);
+        }
         return null;
     }
 
