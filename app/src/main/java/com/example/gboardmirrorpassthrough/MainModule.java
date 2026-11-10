@@ -20,83 +20,129 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Reimplemented behavior from v0.6 DEX. RC2 is untested on a physical phone.
  */
 public final class MainModule extends XposedModule {
+
     private static final String TAG = "GboardMirrorTR";
     private static final String GBOARD = "com.google.android.inputmethod.latin";
     private static final int MIRROR_DEVICE_ID = -100;
     private final WeakHashMap<Object, SparseBooleanArray> consumedKeys = new WeakHashMap<>();
     private final AtomicInteger eventLogs = new AtomicInteger();
-    private HookHandle keyDownHandle;
-    private HookHandle keyUpHandle;
-    private boolean installed;
+    private final java.util.Set<String> hookedMethods = new java.util.HashSet<>();
+    private final java.util.List<HookHandle> liveHooks = new java.util.ArrayList<>();
+
+    private void trace(int level, String message) {
+        Log.println(level, TAG, message);
+        log(level, TAG, message);
+    }
+    private void traceError(String message, Throwable e) {
+        Log.e(TAG, message, e);
+        log(Log.ERROR, TAG, message, e);
+    }
 
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
-        log(Log.INFO, TAG, "RC2 module loaded process=" + param.getProcessName());
+        trace(Log.INFO, "RC3 onModuleLoaded process=" + param.getProcessName());
     }
 
     @Override
     public void onPackageLoaded(PackageLoadedParam param) {
-        if (GBOARD.equals(param.getPackageName())) install("onPackageLoaded");
+        if (GBOARD.equals(param.getPackageName())) {
+            install("onPackageLoaded", param.getDefaultClassLoader());
+        }
     }
 
     @Override
     public void onPackageReady(PackageReadyParam param) {
-        if (GBOARD.equals(param.getPackageName())) install("onPackageReady");
+        if (GBOARD.equals(param.getPackageName())) {
+            install("onPackageReady", param.getClassLoader());
+        }
     }
 
-    private synchronized void install(String stage) {
-        if (installed) return;
-        log(Log.INFO, TAG, "RC2 install attempt " + stage);
-        try {
-            Method down = InputMethodService.class.getDeclaredMethod(
-                    "onKeyDown", int.class, KeyEvent.class);
-            Method up = InputMethodService.class.getDeclaredMethod(
-                    "onKeyUp", int.class, KeyEvent.class);
-            keyDownHandle = hook(down).setId("gboard-mirror-tr-keydown").intercept(chain -> {
-                Object receiver = chain.getThisObject();
-                int code = (Integer) chain.getArg(0);
-                KeyEvent event = (KeyEvent) chain.getArg(1);
-                if (event != null && eventLogs.getAndIncrement() < 24) {
-                    log(Log.INFO, TAG, "RC2 onKeyDown key=" + code
-                            + " device=" + event.getDeviceId()
-                            + " source=" + event.getSource()
-                            + " unicode=" + event.getUnicodeChar()
-                            + " receiver=" + (receiver == null ? "null"
-                            : receiver.getClass().getName()));
+    private synchronized void install(String stage, ClassLoader loader) {
+        trace(Log.INFO, "RC3 " + stage + " package=Gboard");
+        installTarget(InputMethodService.class, "framework");
+        if (loader == null) {
+            trace(Log.WARN, "RC3 Gboard classloader null");
+            return;
+        }
+        String[] candidates = new String[] {
+                "com.android.inputmethod.latin.LatinIME",
+                "com.google.android.inputmethod.latin.LatinIME",
+                "com.google.android.apps.inputmethod.libs.latin5.LatinIME"
+        };
+        boolean found = false;
+        for (String name : candidates) {
+            try {
+                Class<?> candidate = Class.forName(name, false, loader);
+                if (InputMethodService.class.isAssignableFrom(candidate)) {
+                    found = true;
+                    installTarget(candidate, "Gboard LatinIME");
                 }
-                if (receiver instanceof InputMethodService && isMirror(event)) {
-                    try {
-                        if (handleDown((InputMethodService) receiver, code, event)) {
-                            synchronized (consumedKeys) {
-                                keyState(receiver).put(code, true);
+            } catch (ClassNotFoundException ignored) {
+                // Class names vary by installed Gboard version.
+            } catch (Throwable err) {
+                traceError("RC3 service lookup " + name, err);
+            }
+        }
+        if (!found) trace(Log.WARN,
+                "RC3 no named LatinIME class found; platform hooks still installed");
+    }
+
+    private void installTarget(Class<?> owner, String stage) {
+        for (int action = 0; action < 2; action++) {
+            final boolean down = action == 0;
+            final String methodName = down ? "onKeyDown" : "onKeyUp";
+            final String key = owner.getName() + "#" + methodName;
+            if (hookedMethods.contains(key)) continue;
+            final Method method;
+            try {
+                method = owner.getDeclaredMethod(methodName, int.class, KeyEvent.class);
+            } catch (NoSuchMethodException noOverride) {
+                continue;
+            }
+            try {
+                HookHandle handle = hook(method)
+                        .setId("gboard-tr-rc3-" + key)
+                        .intercept(chain -> {
+                            Object receiver = chain.getThisObject();
+                            int code = (Integer) chain.getArg(0);
+                            KeyEvent event = (KeyEvent) chain.getArg(1);
+                            if (down) {
+                                if (event != null && eventLogs.getAndIncrement() < 60) {
+                                    trace(Log.INFO, "RC3 KEYDOWN code=" + code
+                                            + " device=" + event.getDeviceId()
+                                            + " source=0x" + Integer.toHexString(event.getSource())
+                                            + " unicode=" + event.getUnicodeChar()
+                                            + " method=" + key);
+                                }
+                                if (receiver instanceof InputMethodService && isMirror(event)) {
+                                    try {
+                                        if (handleDown((InputMethodService) receiver, code, event)) {
+                                            synchronized (consumedKeys) {
+                                                keyState(receiver).put(code, true);
+                                            }
+                                            return true;
+                                        }
+                                    } catch (Throwable error) {
+                                        traceError("RC3 handleDown failed code=" + code, error);
+                                    }
+                                }
+                            } else if (receiver instanceof InputMethodService && isMirror(event)) {
+                                synchronized (consumedKeys) {
+                                    SparseBooleanArray keys = keyState(receiver);
+                                    if (keys.get(code)) {
+                                        keys.delete(code);
+                                        return true;
+                                    }
+                                }
                             }
-                            return true;
-                        }
-                    } catch (Throwable t) {
-                        log(Log.ERROR, TAG, "RC2 onKeyDown failed key=" + code, t);
-                    }
-                }
-                return chain.proceed();
-            });
-            keyUpHandle = hook(up).setId("gboard-mirror-tr-keyup").intercept(chain -> {
-                Object receiver = chain.getThisObject();
-                int code = (Integer) chain.getArg(0);
-                KeyEvent event = (KeyEvent) chain.getArg(1);
-                if (receiver != null && isMirror(event)) {
-                    synchronized (consumedKeys) {
-                        SparseBooleanArray keys = keyState(receiver);
-                        if (keys.get(code)) {
-                            keys.delete(code);
-                            return true;
-                        }
-                    }
-                }
-                return chain.proceed();
-            });
-            installed = true;
-            log(Log.INFO, TAG, "RC2 InputMethodService onKeyDown/onKeyUp hooks ACTIVE");
-        } catch (Throwable t) {
-            log(Log.ERROR, TAG, "RC2 hook installation FAILED", t);
+                            return chain.proceed();
+                        });
+                liveHooks.add(handle);
+                hookedMethods.add(key);
+                trace(Log.INFO, "RC3 HOOK ACTIVE " + stage + " " + key);
+            } catch (Throwable error) {
+                traceError("RC3 HOOK FAILED " + stage + " " + key, error);
+            }
         }
     }
 
@@ -118,7 +164,7 @@ public final class MainModule extends XposedModule {
     private boolean handleDown(InputMethodService ime, int code, KeyEvent e) {
         InputConnection connection = ime.getCurrentInputConnection();
         if (connection == null) {
-            log(Log.WARN, TAG, "RC2 no InputConnection key=" + code);
+            log(Log.WARN, TAG, "RC3 no InputConnection key=" + code);
             return false;
         }
         if (e.getRepeatCount() > 0 && code != KeyEvent.KEYCODE_DEL) return false;
@@ -132,7 +178,7 @@ public final class MainModule extends XposedModule {
         String text = mappedText(code, e, altGr);
         if (text == null || text.isEmpty()) return false;
         boolean committed = connection.commitText(text, 1);
-        if (!committed) log(Log.WARN, TAG, "RC2 commitText rejected key=" + code);
+        if (!committed) log(Log.WARN, TAG, "RC3 commitText rejected key=" + code);
         return committed;
     }
 
