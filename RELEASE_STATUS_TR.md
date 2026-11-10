@@ -1,8 +1,8 @@
-# RC5 durum
+# Gboard Mirror Turkish Q — RC6 durum
 
-- v0.6 (legacy): Kullanıcı testinde çalışıyor.
-- RC1–RC4 (modern API102): Kullanıcı testinde çalışmıyor.
-- RC5: onPackageReady gerçek ClassLoader + Method tabanlı tekilleştirme; kaynak yaması yapıldı.
-- Android/Gradle derlemesi: GitHub Actions ile kontrol edilecek.
-- Telefon testi: Henüz yapılmadı.
-- Final: Hayır.
+- Çalışan referans: legacy v0.6 (kullanıcı tarafından doğrulandı).
+- Modern RC1–RC5: ekran yansıtma klavyesinde çalışmadı.
+- RC5 logu: `aeht#onKeyDown`, `device=-100`, `mirror=true` görüldü.
+- RC6: `InputConnection` doğrudan basılabilir karakter commit + karar loglama.
+- CI: GitHub Actions'ta derleme ile doğrulanmalı.
+- Gerçek cihaz testi: henüz yapılmadı; final değil.

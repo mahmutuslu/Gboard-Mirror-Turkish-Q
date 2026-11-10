@@ -8,8 +8,8 @@ android {
         applicationId = "com.example.gboardmirrortrv06"
         minSdk = 29
         targetSdk = 32
-        versionCode = 105
-        versionName = "1.0.0-modern-api102-rc5"
+        versionCode = 106
+        versionName = "1.0.0-modern-api102-rc6"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

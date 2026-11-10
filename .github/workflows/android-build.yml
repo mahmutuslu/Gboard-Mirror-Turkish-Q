@@ -1,8 +1,8 @@
-name: Build modern libxposed API 102 RC5 APK
+name: Build modern libxposed API 102 RC6 APK
 
 on:
   push:
-    branches: [main, 'fix/modern-api102-rc5-classloader']
+    branches: [main, 'fix/rc6-direct-printable']
   workflow_dispatch:
 
 permissions:
@@ -31,7 +31,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build modern RC5 APK
+      - name: Build modern RC6 APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify recovered v0.6 hook target
         run: |
@@ -40,6 +40,10 @@ jobs:
           grep -F 'hookedMethods.contains(method)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
           grep -F 'install("onPackageReady", actual)' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
           ! grep -F 'install("onPackageLoaded",' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
+      - name: Verify printable direct commit and diagnostic code
+        run: |
+          grep -F 'RC6 PRINTABLE COMMIT' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
+          grep -F 'new String(Character.toChars(cp))' app/src/main/java/com/example/gboardmirrorpassthrough/MainModule.java
       - name: Verify modern module metadata and APK
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
@@ -54,15 +58,15 @@ jobs:
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC5
+          name: Gboard-Mirror-Turkish-Q-Modern-API102-RC6
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Publish RC5 pre-release after successful build
+      - name: Publish RC6 pre-release after successful build
         if: github.repository == 'mahmutuslu/Gboard-Mirror-Turkish-Q' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-modern-api102-rc5
-          name: Gboard Mirror Turkish Q — Modern API 102 RC5 (test)
+          tag_name: v1.0.0-modern-api102-rc6
+          name: Gboard Mirror Turkish Q — Modern API 102 RC6 (test)
           prerelease: true
           make_latest: false
           body_path: RELEASE_NOTES_TR.md
