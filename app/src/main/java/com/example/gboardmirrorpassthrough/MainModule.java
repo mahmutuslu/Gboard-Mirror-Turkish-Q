@@ -40,7 +40,7 @@ public final class MainModule extends XposedModule {
 
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
-        trace(Log.INFO, "RC3 onModuleLoaded process=" + param.getProcessName());
+        trace(Log.INFO, "RC4 onModuleLoaded process=" + param.getProcessName());
     }
 
     @Override
@@ -58,33 +58,20 @@ public final class MainModule extends XposedModule {
     }
 
     private synchronized void install(String stage, ClassLoader loader) {
-        trace(Log.INFO, "RC3 " + stage + " package=Gboard");
-        installTarget(InputMethodService.class, "framework");
         if (loader == null) {
-            trace(Log.WARN, "RC3 Gboard classloader null");
+            trace(Log.WARN, "RC4: classloader missing in " + stage);
             return;
         }
-        String[] candidates = new String[] {
-                "com.android.inputmethod.latin.LatinIME",
-                "com.google.android.inputmethod.latin.LatinIME",
-                "com.google.android.apps.inputmethod.libs.latin5.LatinIME"
-        };
-        boolean found = false;
-        for (String name : candidates) {
-            try {
-                Class<?> candidate = Class.forName(name, false, loader);
-                if (InputMethodService.class.isAssignableFrom(candidate)) {
-                    found = true;
-                    installTarget(candidate, "Gboard LatinIME");
-                }
-            } catch (ClassNotFoundException ignored) {
-                // Class names vary by installed Gboard version.
-            } catch (Throwable err) {
-                traceError("RC3 service lookup " + name, err);
-            }
+        try {
+            // The verified v0.6 DEX hooks "aeht" rather than InputMethodService.
+            Class<?> target = Class.forName("aeht", false, loader);
+            trace(Log.INFO, "RC4 original target found: " + target.getName());
+            installTarget(target, stage);
+        } catch (ClassNotFoundException error) {
+            trace(Log.WARN, "RC4 aeht not found in " + stage);
+        } catch (Throwable error) {
+            traceError("RC4 aeht lookup failed", error);
         }
-        if (!found) trace(Log.WARN,
-                "RC3 no named LatinIME class found; platform hooks still installed");
     }
 
     private void installTarget(Class<?> owner, String stage) {
@@ -108,7 +95,7 @@ public final class MainModule extends XposedModule {
                             KeyEvent event = (KeyEvent) chain.getArg(1);
                             if (down) {
                                 if (event != null && eventLogs.getAndIncrement() < 60) {
-                                    trace(Log.INFO, "RC3 KEYDOWN code=" + code
+                                    trace(Log.INFO, "RC4 KEYDOWN code=" + code
                                             + " device=" + event.getDeviceId()
                                             + " source=0x" + Integer.toHexString(event.getSource())
                                             + " unicode=" + event.getUnicodeChar()
@@ -123,7 +110,7 @@ public final class MainModule extends XposedModule {
                                             return true;
                                         }
                                     } catch (Throwable error) {
-                                        traceError("RC3 handleDown failed code=" + code, error);
+                                        traceError("RC4 handleDown failed code=" + code, error);
                                     }
                                 }
                             } else if (receiver instanceof InputMethodService && isMirror(event)) {
@@ -139,9 +126,9 @@ public final class MainModule extends XposedModule {
                         });
                 liveHooks.add(handle);
                 hookedMethods.add(key);
-                trace(Log.INFO, "RC3 HOOK ACTIVE " + stage + " " + key);
+                trace(Log.INFO, "RC4 HOOK ACTIVE " + stage + " " + key);
             } catch (Throwable error) {
-                traceError("RC3 HOOK FAILED " + stage + " " + key, error);
+                traceError("RC4 HOOK FAILED " + stage + " " + key, error);
             }
         }
     }
@@ -164,7 +151,7 @@ public final class MainModule extends XposedModule {
     private boolean handleDown(InputMethodService ime, int code, KeyEvent e) {
         InputConnection connection = ime.getCurrentInputConnection();
         if (connection == null) {
-            log(Log.WARN, TAG, "RC3 no InputConnection key=" + code);
+            log(Log.WARN, TAG, "RC4 no InputConnection key=" + code);
             return false;
         }
         if (e.getRepeatCount() > 0 && code != KeyEvent.KEYCODE_DEL) return false;
@@ -178,7 +165,7 @@ public final class MainModule extends XposedModule {
         String text = mappedText(code, e, altGr);
         if (text == null || text.isEmpty()) return false;
         boolean committed = connection.commitText(text, 1);
-        if (!committed) log(Log.WARN, TAG, "RC3 commitText rejected key=" + code);
+        if (!committed) log(Log.WARN, TAG, "RC4 commitText rejected key=" + code);
         return committed;
     }
 
