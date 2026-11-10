@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gboard Mirror Turkish Q (Modern API 102)</string>
+    <string name="module_description">Turkish Q typing in Gboard through Xiaomi mirrored keyboard input</string>
+</resources>
