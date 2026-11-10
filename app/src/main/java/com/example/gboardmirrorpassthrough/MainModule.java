@@ -103,11 +103,14 @@ public final class MainModule extends XposedModule {
                                 }
                                 if (receiver instanceof InputMethodService && isMirror(event)) {
                                     try {
-                                        if (handleDown((InputMethodService) receiver, code, event)) {
-                                            synchronized (consumedKeys) {
-                                                keyState(receiver).put(code, true);
+                                        Boolean result = handleDown((InputMethodService) receiver, code, event);
+                                        if (result != null) {
+                                            if (result) {
+                                                synchronized (consumedKeys) {
+                                                    keyState(receiver).put(code, true);
+                                                }
                                             }
-                                            return true;
+                                            return result;
                                         }
                                     } catch (Throwable error) {
                                         traceError("RC4 handleDown failed code=" + code, error);
@@ -119,6 +122,11 @@ public final class MainModule extends XposedModule {
                                     if (keys.get(code)) {
                                         keys.delete(code);
                                         return true;
+                                    }
+                                    if (!passPrintable(event) || passEditingKey(code)
+                                            || code == KeyEvent.KEYCODE_DEL
+                                            || code == KeyEvent.KEYCODE_FORWARD_DEL) {
+                                        return false;
                                     }
                                 }
                             }
@@ -148,25 +156,62 @@ public final class MainModule extends XposedModule {
                         == InputDevice.SOURCE_KEYBOARD;
     }
 
-    private boolean handleDown(InputMethodService ime, int code, KeyEvent e) {
+
+    // null => invoke Gboard's original method; Boolean => override its return.
+    private Boolean handleDown(InputMethodService ime, int code, KeyEvent e) {
         InputConnection connection = ime.getCurrentInputConnection();
-        if (connection == null) {
-            log(Log.WARN, TAG, "RC4 no InputConnection key=" + code);
+
+        // Working v0.6: Ctrl+A/C/X; let other Ctrl shortcuts reach Gboard.
+        if (e.isCtrlPressed() && !e.isAltPressed() && !e.isMetaPressed()
+                && !e.isShiftPressed() && e.getRepeatCount() == 0) {
+            int action = 0;
+            if (code == KeyEvent.KEYCODE_A) action = android.R.id.selectAll;
+            else if (code == KeyEvent.KEYCODE_C) action = android.R.id.copy;
+            else if (code == KeyEvent.KEYCODE_X) action = android.R.id.cut;
+            if (action != 0 && connection != null
+                    && connection.performContextMenuAction(action)) return true;
+        }
+
+        // Xiaomi-specific shifted unknown-key event in v0.6.
+        if (code == KeyEvent.KEYCODE_UNKNOWN && e.getScanCode() != 0
+                && e.getUnicodeChar() == 0 && e.isShiftPressed()
+                && e.getRepeatCount() == 0 && (e.getFlags() & 8) != 0
+                && connection != null && connection.commitText("?", 1)) return true;
+
+        if ((code == KeyEvent.KEYCODE_DEL || code == KeyEvent.KEYCODE_FORWARD_DEL)
+                && !ordinaryShortcut(e) && !isAltGr(e)) {
+            return connection != null && deleteText(connection,
+                    code == KeyEvent.KEYCODE_FORWARD_DEL);
+        }
+        if (ordinaryShortcut(e)) return null;
+        String text = mappedText(code, e, isAltGr(e));
+        if (text != null && connection != null && connection.commitText(text, 1)) return true;
+        // Preserve native Gboard handling for normal printable keys.
+        if (!passPrintable(e) || passEditingKey(code)) return false;
+        return null;
+    }
+
+    private static boolean deleteText(InputConnection connection, boolean forward) {
+        try {
+            CharSequence selected = connection.getSelectedText(0);
+            if (selected != null && selected.length() > 0) return connection.commitText("", 1);
+            return connection.deleteSurroundingTextInCodePoints(forward ? 0 : 1,
+                    forward ? 1 : 0);
+        } catch (Throwable error) {
             return false;
         }
-        if (e.getRepeatCount() > 0 && code != KeyEvent.KEYCODE_DEL) return false;
-        if (e.isMetaPressed()) return false;
-        boolean altGr = isAltGr(e);
-        if (e.isCtrlPressed() && !altGr) return performShortcut(connection, code);
-        if (code == KeyEvent.KEYCODE_DEL) return deleteBackward(connection);
-        if (code == KeyEvent.KEYCODE_FORWARD_DEL)
-            return connection.deleteSurroundingTextInCodePoints(0, 1);
-        if (passEditingKey(code)) return false;
-        String text = mappedText(code, e, altGr);
-        if (text == null || text.isEmpty()) return false;
-        boolean committed = connection.commitText(text, 1);
-        if (!committed) log(Log.WARN, TAG, "RC4 commitText rejected key=" + code);
-        return committed;
+    }
+
+    private static boolean ordinaryShortcut(KeyEvent e) {
+        int meta = e.getMetaState();
+        return (meta & 0x10000) != 0 || ((meta & 0x1002) != 0 && !isAltGr(e));
+    }
+
+    private static boolean passPrintable(KeyEvent e) {
+        if (ordinaryShortcut(e) || isAltGr(e) || e.getRepeatCount() != 0) return false;
+        int unicode = e.getUnicodeChar();
+        return unicode >= 32 && Character.isValidCodePoint(unicode)
+                && !Character.isISOControl(unicode);
     }
 
     private static boolean deleteBackward(InputConnection connection) {
