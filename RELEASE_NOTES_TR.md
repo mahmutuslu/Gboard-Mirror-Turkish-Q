@@ -1,26 +1,24 @@
-# Gboard Mirror Turkish Q — Modern API 102 RC7
+# Gboard Mirror Turkish Q — Modern API 102 RC8 (Ctrl+V fix)
 
-**Deneysel ön sürüm. RC7 henüz Xiaomi 15 Ultra cihazında doğrulanmadı.**
+**Test ön sürümü.** RC7'nin temel klavye davranışı gerçek Xiaomi 15 Ultra + Windows PC yansıtmasında kullanıcı tarafından doğrulandı; RC8'deki doğrudan Ctrl+V desteği henüz cihazda doğrulanmadı.
 
-## RC6 sonucuyla doğrulananlar
+## RC8'in tek işlevsel değişikliği
 
-- Modern API 102 ile Gboard `aeht.onKeyDown/onKeyUp` kancaları aktif.
-- Xiaomi PC Manager üzerinden normal harfler ve Türkçe Q karakterleri çalışıyor; `commitText` `accepted=true`.
-- Kullanıcının 10 Kasım 2026 logları `Shift=59` ile beraber `KEYCODE_UNKNOWN=0 unicode=0` içeriyor; bu olayların Shift+? ile ilişkili olması kuvvetli olasılık ama henüz skan kodu doğrulanmadı.
+- `Ctrl+V`, `InputConnection.performContextMenuAction(android.R.id.paste)` üzerinden doğrudan yapıştırma işlemini çağırır.
+- `Ctrl+A`, `Ctrl+C`, `Ctrl+X` mevcut işlem yolunu korur.
+- Yapıştırma çağrısı başarısızsa Gboard'un orijinal işleyicisi devreye girebilir.
+- Türkçe Q, Shift + ?, AltGr, harfler, Backspace ve diğer RC7 davranışları değiştirilmedi.
+- Tanılama etiketleri RC8 olarak güncellendi.
 
-## RC7 tek hedefli değişiklik
+## Kurulum ve kısa kontrol
 
-- Shift tuşunun basılı durumunu Gboard IME nesnesine bağlı, kısa süreli (1800 ms) tutar ve key-up ile temizler.
-- Yalnızca Xiaomi yansıtmasının `deviceId=-100` tuşlarında; Shift ile beraber gelen `KEYCODE_UNKNOWN, unicode=0, repeat=0` olayını `?` karakterine dönüştürmeyi dener.
-- CTRL, ALT, META kısayollarına dokunmaz. Shift olmadan gelen bilinmeyen tuşları Gboard'a bırakır.
-- Bilinmeyen tuş için `scanCode, flags, metaState, repeatCount, shiftRecent` tanı bilgilerini loglar, metin alanının içeriğini kaydetmez.
-- Diğer harfler, Türkçe Q, silme ve mevcut tuş eşleme kodları RC6 ile aynıdır.
+1. Çalışan RC7 APK'yı koruyun; RC8 APK'yı üzerine yükleyin.
+2. `autoHotReload=false`: modül yenilemesi için **telefonu yeniden başlatın**.
+3. LSPosed kapsamı: `com.google.android.inputmethod.latin`.
+4. Xiaomi PC Manager ekran yansıtmasında metin seçip sırasıyla `Ctrl+C`, `Ctrl+V`, `Ctrl+A`, `Ctrl+X`; sonra `ğüşiöçı`, `Shift+?` ve Backspace deneyin.
 
-## Test
+```powershell
+& 'C:\platform-tools\adb.exe' logcat -d -v time -s GboardMirrorTR:V
+```
 
-1. Çalışan eski v0.6 APK'sını saklayın.
-2. RC7 APK'yı kurun ve **telefonu yeniden başlatın** (`autoHotReload=false`).
-3. Gboard varsayılan ve LSPosed kapsamında seçili iken ekran yansıtmasında `a`, `*`, `Shift+*` (Türkçe Q soru işareti), `ğüşiöçı` ve Backspace deneyin.
-4. Gerekirse `adb logcat -d -v time -s GboardMirrorTR:V` ile `RC7 QUESTION COMMIT` ve `RC7 UNKNOWN KEYDOWN` kayıtlarını kontrol edin.
-
-**Bu sürüm test içindir, Final değildir.**
+**CI derlemesi başarılı olsa bile RC8'in gerçek cihazda yapıştırmayı düzelttiği ayrıca doğrulanmalıdır. Final sürüm değildir.**

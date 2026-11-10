@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Native libxposed API 102 port of user-supplied Gboard Mirror Turkish Q v0.6.
- * Reimplemented behavior from v0.6 DEX. RC7 is unverified on-device; v0.6 was verified working.
+ * Reimplemented behavior from v0.6 DEX. RC8 is unverified on-device; v0.6 was verified working.
  */
 public final class MainModule extends XposedModule {
 
@@ -44,7 +44,7 @@ public final class MainModule extends XposedModule {
 
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
-        trace(Log.INFO, "RC7 onModuleLoaded process=" + param.getProcessName());
+        trace(Log.INFO, "RC8 onModuleLoaded process=" + param.getProcessName());
     }
 
     @Override
@@ -53,7 +53,7 @@ public final class MainModule extends XposedModule {
         // Do NOT install application hooks here: the legacy v0.6 hook targets
         // the loader which really owns the running Gboard IME class.
         if (GBOARD.equals(param.getPackageName())) {
-            trace(Log.INFO, "RC7 PACKAGE LOADED (waiting for ready loader)"
+            trace(Log.INFO, "RC8 PACKAGE LOADED (waiting for ready loader)"
                     + " defaultLoader=" + describeLoader(param.getDefaultClassLoader()));
         }
     }
@@ -63,7 +63,7 @@ public final class MainModule extends XposedModule {
         if (GBOARD.equals(param.getPackageName())) {
             ClassLoader actual = param.getClassLoader();
             ClassLoader early = param.getDefaultClassLoader();
-            trace(Log.INFO, "RC7 PACKAGE READY activeLoader=" + describeLoader(actual)
+            trace(Log.INFO, "RC8 PACKAGE READY activeLoader=" + describeLoader(actual)
                     + " differentFromDefault=" + (actual != early));
             install("onPackageReady", actual);
         }
@@ -77,19 +77,19 @@ public final class MainModule extends XposedModule {
 
     private synchronized void install(String stage, ClassLoader loader) {
         if (loader == null) {
-            trace(Log.WARN, "RC7: classloader missing in " + stage);
+            trace(Log.WARN, "RC8: classloader missing in " + stage);
             return;
         }
         try {
             // The verified v0.6 DEX hooks "aeht" rather than InputMethodService.
             Class<?> target = Class.forName("aeht", false, loader);
-            trace(Log.INFO, "RC7 original target FOUND: " + target.getName()
+            trace(Log.INFO, "RC8 original target FOUND: " + target.getName()
                     + " definingLoader=" + describeLoader(target.getClassLoader()));
             installTarget(target, stage);
         } catch (ClassNotFoundException error) {
-            trace(Log.WARN, "RC7 aeht not found in " + stage);
+            trace(Log.WARN, "RC8 aeht not found in " + stage);
         } catch (Throwable error) {
-            traceError("RC7 aeht lookup failed", error);
+            traceError("RC8 aeht lookup failed", error);
         }
     }
 
@@ -105,7 +105,7 @@ public final class MainModule extends XposedModule {
                 continue;
             }
             if (hookedMethods.contains(method)) {
-                trace(Log.INFO, "RC7 SAME METHOD already hooked: " + key
+                trace(Log.INFO, "RC8 SAME METHOD already hooked: " + key
                         + " classLoader=" + describeLoader(owner.getClassLoader()));
                 continue;
             }
@@ -128,7 +128,7 @@ public final class MainModule extends XposedModule {
                             if (down) {
                                 if (isMirror(event) && code == KeyEvent.KEYCODE_UNKNOWN
                                         && unknownLogs.getAndIncrement() < 80) {
-                                    trace(Log.INFO, "RC7 UNKNOWN KEYDOWN scan="
+                                    trace(Log.INFO, "RC8 UNKNOWN KEYDOWN scan="
                                             + event.getScanCode()
                                             + " flags=0x" + Integer.toHexString(event.getFlags())
                                             + " meta=0x" + Integer.toHexString(event.getMetaState())
@@ -137,7 +137,7 @@ public final class MainModule extends XposedModule {
                                             + " shiftRecent=" + recentShift(receiver));
                                 }
                                 if (isMirror(event) && eventLogs.getAndIncrement() < 100) {
-                                    trace(Log.INFO, "RC7 KEYDOWN code=" + code
+                                    trace(Log.INFO, "RC8 KEYDOWN code=" + code
                                             + " device=" + event.getDeviceId()
                                             + " source=0x" + Integer.toHexString(event.getSource())
                                             + " unicode=" + event.getUnicodeChar()
@@ -162,10 +162,10 @@ public final class MainModule extends XposedModule {
                                             return result;
                                         }
                                     } catch (Throwable error) {
-                                        traceError("RC7 handleDown failed code=" + code, error);
+                                        traceError("RC8 handleDown failed code=" + code, error);
                                     }
                                 } else if (isMirror(event) && down) {
-                                    trace(Log.WARN, "RC7 KEYDOWN has non-IME receiver code="
+                                    trace(Log.WARN, "RC8 KEYDOWN has non-IME receiver code="
                                             + code + " receiver=" + receiver);
                                 }
                             } else if (receiver instanceof InputMethodService && isMirror(event)) {
@@ -185,17 +185,17 @@ public final class MainModule extends XposedModule {
                             Object originalResult = chain.proceed();
                             if (down && isMirror(event)
                                     && decisionLogs.getAndIncrement() < 110) {
-                                trace(Log.INFO, "RC7 NATIVE RESULT code=" + code
+                                trace(Log.INFO, "RC8 NATIVE RESULT code=" + code
                                         + " value=" + originalResult);
                             }
                             return originalResult;
                         });
                 liveHooks.add(handle);
                 hookedMethods.add(method);
-                trace(Log.INFO, "RC7 HOOK ACTIVE " + stage + " " + key
+                trace(Log.INFO, "RC8 HOOK ACTIVE " + stage + " " + key
                         + " definingLoader=" + describeLoader(owner.getClassLoader()));
             } catch (Throwable error) {
-                traceError("RC7 HOOK FAILED " + stage + " " + key, error);
+                traceError("RC8 HOOK FAILED " + stage + " " + key, error);
             }
         }
     }
@@ -234,13 +234,14 @@ public final class MainModule extends XposedModule {
     private Boolean handleDown(InputMethodService ime, int code, KeyEvent e) {
         InputConnection connection = ime.getCurrentInputConnection();
 
-        // Working v0.6: Ctrl+A/C/X; let other Ctrl shortcuts reach Gboard.
+        // Explicit Ctrl+A/C/X/V support; let other Ctrl shortcuts reach Gboard.
         if (e.isCtrlPressed() && !e.isAltPressed() && !e.isMetaPressed()
                 && !e.isShiftPressed() && e.getRepeatCount() == 0) {
             int action = 0;
             if (code == KeyEvent.KEYCODE_A) action = android.R.id.selectAll;
             else if (code == KeyEvent.KEYCODE_C) action = android.R.id.copy;
             else if (code == KeyEvent.KEYCODE_X) action = android.R.id.cut;
+            else if (code == KeyEvent.KEYCODE_V) action = android.R.id.paste;
             if (action != 0 && connection != null
                     && connection.performContextMenuAction(action)) return true;
         }
@@ -256,7 +257,7 @@ public final class MainModule extends XposedModule {
                 && (e.isShiftPressed() || recentShift(ime))) {
             boolean accepted = connection != null && connection.commitText("?", 1);
             if (decisionLogs.getAndIncrement() < 110) {
-                trace(Log.INFO, "RC7 QUESTION COMMIT accepted=" + accepted
+                trace(Log.INFO, "RC8 QUESTION COMMIT accepted=" + accepted
                         + " scan=" + e.getScanCode()
                         + " flags=0x" + Integer.toHexString(e.getFlags())
                         + " meta=0x" + Integer.toHexString(e.getMetaState()));
@@ -274,7 +275,7 @@ public final class MainModule extends XposedModule {
         if (text != null) {
             boolean committed = connection != null && connection.commitText(text, 1);
             if (decisionLogs.getAndIncrement() < 110) {
-                trace(Log.INFO, "RC7 MAPPED COMMIT code=" + code
+                trace(Log.INFO, "RC8 MAPPED COMMIT code=" + code
                         + " connection=" + (connection != null)
                         + " accepted=" + committed);
             }
@@ -282,9 +283,9 @@ public final class MainModule extends XposedModule {
         }
         if (!passPrintable(e) || passEditingKey(code)) return false;
 
-        // RC7 fell through to Gboard's original handler for ordinary
+        // RC8 fell through to Gboard's original handler for ordinary
         // printable keys, despite the device emitting valid unicode here.
-        // In RC7, commit the already-decoded character directly, once.
+        // In RC8, commit the already-decoded character directly, once.
         // Do not call the original method when commit succeeds.
         int cp = e.getUnicodeChar();
         if (connection != null && cp >= 32 && Character.isValidCodePoint(cp)
@@ -292,12 +293,12 @@ public final class MainModule extends XposedModule {
             boolean committed = connection.commitText(
                     new String(Character.toChars(cp)), 1);
             if (decisionLogs.getAndIncrement() < 110) {
-                trace(Log.INFO, "RC7 PRINTABLE COMMIT code=" + code
+                trace(Log.INFO, "RC8 PRINTABLE COMMIT code=" + code
                         + " connection=true accepted=" + committed);
             }
             if (committed) return true;
         } else if (decisionLogs.getAndIncrement() < 110) {
-            trace(Log.WARN, "RC7 PRINTABLE NO CONNECTION/UNICODE code="
+            trace(Log.WARN, "RC8 PRINTABLE NO CONNECTION/UNICODE code="
                     + code + " conn=" + (connection != null)
                     + " unicode=" + cp);
         }
