@@ -62,9 +62,9 @@ public final class MainModule extends XposedModule {
                 return chain.proceed();
             });
             hooksInstalled = true;
-            log("Gboard Mirror TR modern API102: hooks installed");
+            log(android.util.Log.INFO, "GboardMirrorTR", "Modern API 102 hooks installed");
         } catch (Throwable error) {
-            log("Gboard Mirror TR modern API102: hook install failed: " + error);
+            log(android.util.Log.ERROR, "GboardMirrorTR", "Modern API 102 hook installation failed", error);
         }
     }
 
