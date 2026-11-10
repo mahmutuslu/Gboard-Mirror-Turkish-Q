@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout verified source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Verify final implementation is exactly RC8
         run: |
           git diff --exit-code 9d1755b0056ad58ba9e82cbc0b318cdb2b8931ba HEAD -- \
