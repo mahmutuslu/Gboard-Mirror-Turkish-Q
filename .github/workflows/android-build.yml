@@ -2,7 +2,7 @@ name: Build modern libxposed API 102 RC5 APK
 
 on:
   push:
-    branches: [main, 'fix/modern-api102-aeht-rc5']
+    branches: [main, 'fix/modern-api102-rc5-classloader']
   workflow_dispatch:
 
 permissions:
